@@ -106,7 +106,7 @@ class _NeRF(nn.Module):
         return torch.cat((radiance, density), -1)
 
 
-class MipNeRF(nn.Module):
+class NeRF(nn.Module):
     r"""
     NeRF
     ====
