@@ -59,7 +59,7 @@ scikit-image==0.19.3
 
 3. **位置编码的变化** 对单个点的位置进行位置编码（PE） $\Longrightarrow$  对每个conical frustum区域位置进行综合位置编码（IPE）
 
-4. **模型及损失函数的变化** $\min\limits_{\Theta^c,\Theta^f}{\sum\limits_{r\in{\mathcal{R}}}{\left(\left\Vert{\mathbf{C}^*\left(\mathbf{r}\right)-\mathbf{C}\left(\mathbf{r};\Theta^c,\mathbf{t}^c\right)}\right\Vert_2^2+\left\Vert{\mathbf{C}^*\left(\mathbf{r}\right)-\mathbf{C}\left(\mathbf{r};\Theta^f,sort\left(\mathbf{t}^c\cup{\mathbf{t}^f}\right)\right)}\right\Vert_2^2\right)}}$ $\Longrightarrow$ $\min\limits_{\Theta}{\sum\limits_{r\in{\mathcal{R}}}{\left(\lambda\left\Vert{\mathbf{C}^*\left(\mathbf{r}\right)-\mathbf{C}\left(\mathbf{r};\Theta,\mathbf{t}^c\right)}\right\Vert_2^2+\left\Vert{\mathbf{C}^*\left(\mathbf{r}\right)-\mathbf{C}\left(\mathbf{r};\Theta,\mathbf{t}^f\right)}\right\Vert_2^2\right)}}$ 
+4. **模型及损失函数的变化**  coarse和fine两个神经网络  $\Longrightarrow$ 一个多尺度神经网络
 
 <img src="./other_imgs/ray_cone_tracing.png">图1： NeRF和Mip-NeRF [[1](#1)]</img>
 
@@ -90,32 +90,38 @@ $$
 $$
 
 $$
-\gamma\left(\mathbf{\mu},\mathbf{\Sigma}\right)=E_{\mathbf{x}\sim{\mathcal{N}}\left(\mathbf{\mu_{\gamma}},\mathbf{\Sigma_{\gamma}}\right)}\left[\gamma\left(\mathbf{x}\right)\right]=\begin{bmatrix} 
+\gamma\left(\mathbf{\mu},\mathbf{\Sigma}\right)=E_{\mathbf{x}\sim{\mathcal{N}}\left(\mathbf{\mu_{\gamma}}, \mathbf{\Sigma_{\gamma}}\right)}\left[\gamma\left(\mathbf{x}\right)\right]=\begin{bmatrix} 
 \sin\left(\mathbf{\mu_{\gamma}}\right)\otimes\exp\left(-\left(1/2\right)\mathrm{diag}\left(\mathbf{\Sigma_{\gamma}}\right)\right) \\ 
 \cos\left(\mathbf{\mu_{\gamma}}\right)\otimes\exp\left(-\left(1/2\right)\mathrm{diag}\left(\mathbf{\Sigma_{\gamma}}\right)\right)
 \end{bmatrix}\tag{5}
 $$
 
-其中 $\mathbf{P}=\begin{bmatrix} \mathbf{I} & 2\mathbf{I} & \cdots & 2^{L-1}\mathbf{I}\end{bmatrix}^T$ ， $\otimes$ 表示哈达玛积（对应元素相乘）
+其中 
+
+$$
+\mathbf{P}=\begin{bmatrix} \mathbf{I} & 2\mathbf{I} & \cdots & 2^{L-1}\mathbf{I}\end{bmatrix}^T \tag{6}
+$$ 
+
+， $\otimes$  表示哈达玛积（对应元素相乘）
 
 又由于公式5中只用到了 $\mathbf{\Sigma_{\gamma}}$ 的对角线，因此可以公式可以优化为
 
 $$
-\mathbf{\mu}=\mathbf{o}+\mu_t\mathbf{d},\ \ \ \ \mathrm{diag}\left(\mathbf{\Sigma}\right)=\sigma_t^2\left(\mathbf{d}\otimes\mathbf{d}\right)+\sigma_r^2\left(\mathbf{I}-\frac{\mathbf{d}\otimes\mathbf{d}}{\left\Vert{\mathbf{d}}\right\Vert_2^2}\right) \tag{6}
+\mathbf{\mu}=\mathbf{o}+\mu_t\mathbf{d},\ \ \ \ \mathrm{diag}\left(\mathbf{\Sigma}\right)=\sigma_t^2\left(\mathbf{d}\otimes\mathbf{d}\right)+\sigma_r^2\left(\mathbf{I}-\frac{\mathbf{d}\otimes\mathbf{d}}{\left\Vert{\mathbf{d}}\right\Vert_2^2}\right) \tag{7}
 $$
 
 $$
-\mathbf{\mu_{\gamma}}=\mathbf{P}\mathbf{\mu}, \ \ \ \ \mathrm{diag}\left(\mathbf{\Sigma_{\gamma}}\right)=\mathbf{P}^2\mathrm{diag}\left(\mathbf{\Sigma}\right).\tag{7}
+\mathbf{\mu_{\gamma}}=\mathbf{P}\mathbf{\mu}, \ \ \ \ \mathrm{diag}\left(\mathbf{\Sigma_{\gamma}}\right)=\mathbf{P}^2\mathrm{diag}\left(\mathbf{\Sigma}\right).\tag{8}
 $$
 
 $$
-\gamma\left(\mathbf{\mu},\mathbf{\Sigma}\right)=E_{\mathbf{x}\sim{\mathcal{N}}\left(\mathbf{\mu_{\gamma}},\mathbf{\Sigma_{\gamma}}\right)}\left[\gamma\left(\mathbf{x}\right)\right]=\begin{bmatrix} 
+\gamma\left(\mathbf{\mu},\mathbf{\Sigma}\right)=E_{\mathbf{x}\sim{\mathcal{N}}\left(\mathbf{\mu_{\gamma}}, \mathbf{\Sigma_{\gamma}}\right)}\left[\gamma\left(\mathbf{x}\right)\right]=\begin{bmatrix} 
 \sin\left(\mathbf{\mu_{\gamma}}\right)\otimes\exp\left(-\left(1/2\right)\mathrm{diag}\left(\mathbf{\Sigma_{\gamma}}\right)\right) \\ 
 \cos\left(\mathbf{\mu_{\gamma}}\right)\otimes\exp\left(-\left(1/2\right)\mathrm{diag}\left(\mathbf{\Sigma_{\gamma}}\right)\right)
-\end{bmatrix}\tag{8}
+\end{bmatrix}\tag{9}
 $$
 
-至于 $\mu_t$ 、$\sigma_t^2$ 、 $\sigma_r^2$ 与 $t_0$ 、 $t_1$ 的关系推导可以假设为均匀分布然后通过三重积分计算出 $t$ 的一阶原点矩以及二阶原点距从而求出 $t$ 的均值方差；再计算出 $x$ 的二阶原点矩，根据 $x$ 的方差和 $r$ 的方差相等且 $x$ 的一阶原点矩为0（对称性）从而求出 $r$ 的二阶中心矩（即方差）。
+至于 $\mu_t$ 、 $\sigma_t^2$ 、 $\sigma_r^2$ 与 $t_0$ 、 $t_1$ 的关系推导可以假设为均匀分布然后通过三重积分计算出 $t$ 的一阶原点矩以及二阶原点距从而求出 $t$ 的均值方差；再计算出 $x$ 的二阶原点矩，根据 $x$ 的方差和 $r$ 的方差相等且 $x$ 的一阶原点矩为0（对称性）从而求出 $r$ 的二阶中心矩（即方差）。
 
 ## 数据集
 
@@ -128,6 +134,7 @@ Blender Dataset同NeRF项目，Multiscale Blender Dataset则在此基础上增�
 | PyTorch(GPU) | NeRF(NeRF项目) | $1/2$ | 31.440 | 0.9750 |
 | PyTorch(GPU) | mip-NeRF(该项目) | $1/2$ | 34.078 | 0.9855 |
 | PyTorch(GPU) | mip-NeRF(该项目) | $1$ | 32.657 | 0.9771 |
+
 表2：NeRF与mip-NeRF在原始单一分辨率数据集Blender Dataset中lego场景上结果比较
 
 <br>
@@ -140,6 +147,8 @@ Blender Dataset同NeRF项目，Multiscale Blender Dataset则在此基础上增�
 | Jax(TPU) | mip-NeRF(论文[[1](#1)]) | $1,1/2,1/4,1/8$ | 35.736 | 0.9843 |
 
 表3：NeRF与mip-NeRF在多分辨率数据集Multiscale Blender Dataset中lego场景上结果比较
+
+<br>
 
 从表1定性来看，mip-NeRF上重建的场景和Ground Truth差别较小，尤其是 $lego$ 场景，效果很好。
 
